@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Viva History - AI Viva Prep Bot{% endblock %}
+
+{% block content %}
+<div class="history-container">
+    <div class="history-header">
+        <div>
+            <h1>Past Viva Practice History</h1>
+            <p class="text-muted">Review your answers, scores, and examiner feedback across all sessions.</p>
+        </div>
+        <div class="history-actions">
+            <a href="{{ url_for('download_report') }}" class="btn btn-primary" title="Export this history to PDF">
+                📄 Download PDF Report
+            </a>
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                🚀 New Viva Session
+            </a>
+        </div>
+    </div>
+
+    {% if sessions %}
+        <div class="history-cards-list">
+            {% for session in sessions %}
+                <div class="card history-session-card">
+                    <div class="session-card-top">
+                        <div class="session-badges">
+                            <span class="badge badge-primary">{{ session.subject }}</span>
+                            <span class="badge badge-secondary">{{ session.topic }}</span>
+                            <span class="badge badge-outline">{{ session.difficulty }}</span>
+                            <span class="text-muted session-timestamp">
+                                📅 {{ session.created_at.strftime('%b %d, %Y - %I:%M %p') if session.created_at else '' }}
+                            </span>
+                        </div>
+                        <div class="session-score">
+                            <span class="score-badge {% if session.score >= 8 %}score-high{% elif session.score >= 5 %}score-medium{% else %}score-low{% endif %}">
+                                {{ session.score }} / {{ session.total }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="session-stat-pills mt-2">
+                        <span class="stat-pill">⏱️ Response Time: {{ session.time_taken_seconds }}s</span>
+                        <span class="stat-pill">💡 Hints: {{ session.hints_used }} / 3</span>
+                    </div>
+
+                    <div class="session-qa mt-3">
+                        <p class="history-q"><strong>🎯 Question:</strong> {{ session.question }}</p>
+                        <p class="history-a"><strong>🗣️ Your Answer:</strong> {{ session.user_answer }}</p>
+                        <p class="history-f"><strong>🤖 Examiner Feedback:</strong> {{ session.feedback }}</p>
+                        {% if session.improved_answer %}
+                            <div class="history-model mt-2">
+                                <strong>✨ Exemplary Answer:</strong>
+                                <p>{{ session.improved_answer }}</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="card empty-history-card text-center">
+            <div class="empty-icon">📜</div>
+            <h2>No Viva Sessions Recorded Yet</h2>
+            <p class="text-muted">You haven't completed any viva preparation sessions yet. Choose a domain to begin!</p>
+            <div class="mt-4">
+                <a href="{{ url_for('index') }}" class="btn btn-primary btn-lg">Start Practicing Now</a>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

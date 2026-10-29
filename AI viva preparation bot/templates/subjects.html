@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Explore Subjects - AI Viva Prep Bot{% endblock %}
+
+{% block content %}
+<div class="subjects-container">
+    <div class="text-center mb-4">
+        <h1>Available Technical Viva Domains</h1>
+        <p class="text-muted">Choose a subject to launch specialized oral examination questions.</p>
+    </div>
+
+    <div class="subjects-grid">
+        <div class="card subject-card">
+            <div class="subject-icon">💻</div>
+            <h3>Operating Systems</h3>
+            <p>Processes vs threads, CPU scheduling, virtual memory, paging, deadlocks, and synchronization primitives.</p>
+            <form action="{{ url_for('practice') }}" method="POST">
+                <input type="hidden" name="subject" value="Operating Systems">
+                <input type="hidden" name="difficulty" value="Intermediate">
+                <button type="submit" class="btn btn-primary btn-block">Practice OS Viva &rarr;</button>
+            </form>
+        </div>
+
+        <div class="card subject-card">
+            <div class="subject-icon">🌲</div>
+            <h3>Data Structures & Algorithms</h3>
+            <p>Arrays vs linked lists, trees, graphs, hashing, sorting complexities, and dynamic programming fundamentals.</p>
+            <form action="{{ url_for('practice') }}" method="POST">
+                <input type="hidden" name="subject" value="Data Structures">
+                <input type="hidden" name="difficulty" value="Intermediate">
+                <button type="submit" class="btn btn-primary btn-block">Practice DSA Viva &rarr;</button>
+            </form>
+        </div>
+
+        <div class="card subject-card">
+            <div class="subject-icon">🗄️</div>
+            <h3>Database Systems (DBMS)</h3>
+            <p>ACID transactions, normalization (1NF-BCNF), indexing (B+ Trees, Hashing), and SQL vs NoSQL trade-offs.</p>
+            <form action="{{ url_for('practice') }}" method="POST">
+                <input type="hidden" name="subject" value="Database Systems">
+                <input type="hidden" name="difficulty" value="Intermediate">
+                <button type="submit" class="btn btn-primary btn-block">Practice DBMS Viva &rarr;</button>
+            </form>
+        </div>
+
+        <div class="card subject-card">
+            <div class="subject-icon">🧠</div>
+            <h3>Machine Learning & AI</h3>
+            <p>Bias-variance tradeoff, evaluation metrics, overfitting, gradient descent, and neural network architectures.</p>
+            <form action="{{ url_for('practice') }}" method="POST">
+                <input type="hidden" name="subject" value="Machine Learning">
+                <input type="hidden" name="difficulty" value="Intermediate">
+                <button type="submit" class="btn btn-primary btn-block">Practice ML Viva &rarr;</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

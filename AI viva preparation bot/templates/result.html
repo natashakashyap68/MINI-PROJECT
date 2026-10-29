@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Assessment Results - AI Viva Prep Bot{% endblock %}
+
+{% block content %}
+<div class="result-container">
+    <div class="card result-card">
+        <div class="result-header">
+            <div class="result-title-group">
+                <span class="badge badge-primary">{{ subject }}</span>
+                <span class="badge badge-secondary">{{ topic }}</span>
+                <span class="badge badge-outline">{{ difficulty }}</span>
+                <h1>Oral Viva Assessment & Feedback</h1>
+            </div>
+
+            <!-- Visual Score Meter -->
+            <div class="score-card-badge {% if raw_score >= 8 %}score-high{% elif raw_score >= 5 %}score-medium{% else %}score-low{% endif %}">
+                <div class="score-number">{{ score }}</div>
+                <div class="score-label">
+                    {% if raw_score >= 8 %}
+                        🌟 Excellent Viva Response
+                    {% elif raw_score >= 5 %}
+                        👍 Satisfactory / Passing
+                    {% else %}
+                        ⚠️ Needs Review & Practice
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Meta info: Time taken & hints used -->
+        <div class="session-stat-pills">
+            <span class="stat-pill">⏱️ Response Time: <strong>{{ time_taken_seconds }}s</strong></span>
+            <span class="stat-pill">💡 Hints Consulted: <strong>{{ hints_used }} / 3</strong></span>
+        </div>
+
+        <hr class="divider">
+
+        <!-- Question & Answer Review -->
+        <div class="qa-review-section">
+            <div class="review-block">
+                <h4>🎯 Viva Question:</h4>
+                <blockquote class="question-quote">{{ question }}</blockquote>
+            </div>
+
+            <div class="review-block">
+                <h4>🗣️ Your Oral/Typed Response:</h4>
+                <div class="user-answer-box">
+                    {% if answer %}
+                        <p>{{ answer }}</p>
+                    {% else %}
+                        <p class="text-muted"><em>(No answer provided)</em></p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Evaluator Detailed Feedback -->
+        <div class="feedback-section">
+            <h4>🤖 AI Examiner Evaluation:</h4>
+            <div class="feedback-box">
+                <p>{{ feedback }}</p>
+            </div>
+        </div>
+
+        <!-- Exemplary Model Answer -->
+        {% if improved_answer %}
+            <div class="model-answer-section">
+                <h4>✨ Exemplary Model Viva Answer:</h4>
+                <div class="model-answer-box">
+                    <p>{{ improved_answer }}</p>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Viva Examiner's Follow-Up Question -->
+        {% if followup_question %}
+            <div class="followup-section">
+                <div class="followup-card">
+                    <div class="followup-header">
+                        <h4>🤔 Examiner's Follow-Up Question:</h4>
+                        <span class="badge badge-warning">Oral Probe</span>
+                    </div>
+                    <p class="followup-text">"{{ followup_question }}"</p>
+                    
+                    <form action="{{ url_for('practice') }}" method="POST" style="margin-top: 10px;">
+                        <input type="hidden" name="subject" value="{{ subject }}">
+                        <input type="hidden" name="difficulty" value="{{ difficulty }}">
+                        <input type="hidden" name="topic" value="{{ topic }} (Follow-up)">
+                        <button type="submit" class="btn btn-secondary btn-sm">
+                            👉 Practice This Follow-Up Question Now
+                        </button>
+                    </form>
+                </div>
+            </div>
+        {% endif %}
+
+        <hr class="divider">
+
+        <!-- Action Buttons -->
+        <div class="result-actions">
+            <a href="{{ url_for('index') }}" class="btn btn-primary">
+                🔄 Practice Another Subject
+            </a>
+            {% if current_user %}
+                <a href="{{ url_for('dashboard') }}" class="btn btn-outline">
+                    📊 View Weak Topics & Dashboard
+                </a>
+                <a href="{{ url_for('history') }}" class="btn btn-outline">
+                    📜 Session History
+                </a>
+                <a href="{{ url_for('download_report') }}" class="btn btn-secondary">
+                    📄 Download PDF Report
+                </a>
+            {% else %}
+                <a href="{{ url_for('register') }}" class="btn btn-outline">
+                    💾 Create Free Account to Save History
+                </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

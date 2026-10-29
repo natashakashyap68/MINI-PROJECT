@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard & Weak Topic Detector - AI Viva Prep Bot{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <div>
+            <h1>Performance Dashboard & Weak Topic Detector</h1>
+            <p class="text-muted">Real-time performance analytics derived from your actual viva examination records.</p>
+        </div>
+        <div class="dashboard-actions">
+            <a href="{{ url_for('download_report') }}" class="btn btn-primary" title="Export complete performance data to PDF">
+                📄 Export PDF Performance Report
+            </a>
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                🚀 New Viva Session
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary KPI Cards -->
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-icon">📝</div>
+            <div class="kpi-info">
+                <span class="kpi-label">Total Viva Sessions</span>
+                <span class="kpi-value">{{ total_sessions }}</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon">🎯</div>
+            <div class="kpi-info">
+                <span class="kpi-label">Average Score</span>
+                <span class="kpi-value">{{ avg_score }} <small>/ 10</small></span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon">⚠️</div>
+            <div class="kpi-info">
+                <span class="kpi-label">Target Weak Subject</span>
+                <span class="kpi-value highlight-weak">
+                    {{ recommendation.weak_subject if recommendation else 'N/A' }}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    {% if analytics %}
+        <div class="dashboard-main-grid">
+            <!-- Subject Performance Bars -->
+            <section class="card subject-analytics-card">
+                <div class="card-header">
+                    <h3>📊 Subject Mastery Breakdown</h3>
+                    <p class="text-muted">Evaluated proficiency across technical domains.</p>
+                </div>
+
+                <div class="subject-bars-list">
+                    {% for subject, percentage in analytics.items() %}
+                        <div class="subject-bar-item">
+                            <div class="subject-bar-header">
+                                <span class="subject-name"><strong>{{ subject }}</strong></span>
+                                <span class="subject-percentage {% if percentage >= 80 %}text-success{% elif percentage >= 60 %}text-warning{% else %}text-danger{% endif %}">
+                                    {{ percentage }}%
+                                </span>
+                            </div>
+                            <div class="progress-track">
+                                <div class="progress-fill {% if percentage >= 80 %}bg-success{% elif percentage >= 60 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                     style="width: {{ percentage }}%;">
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <!-- Weak Topic Detector & AI Study Plan -->
+            {% if recommendation %}
+                <section class="card weak-topic-card">
+                    <div class="weak-topic-header">
+                        <div class="alert-tag">⚠️ Target Focus Area</div>
+                        <h2>{{ recommendation.weak_subject }}</h2>
+                        <p class="weak-subtitle">Identified as your lowest-scoring domain based on evaluation data.</p>
+                    </div>
+
+                    <div class="weak-topic-body">
+                        <h4>📌 Recommended Sub-Topics to Master:</h4>
+                        <ul class="topic-checklist">
+                            {% for topic in recommendation.recommended_topics %}
+                                <li>
+                                    <span class="check-bullet">👉</span>
+                                    <span>{{ topic }}</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+
+                        <div class="ai-advice-box">
+                            <strong>💡 AI Examiner Advice:</strong>
+                            <p>{{ recommendation.actionable_advice }}</p>
+                        </div>
+
+                        <form action="{{ url_for('practice') }}" method="POST" class="mt-4">
+                            <input type="hidden" name="subject" value="{{ recommendation.weak_subject }}">
+                            <input type="hidden" name="difficulty" value="Intermediate">
+                            <button type="submit" class="btn btn-warning btn-block">
+                                🎯 Practice {{ recommendation.weak_subject }} Now
+                            </button>
+                        </form>
+                    </div>
+                </section>
+            {% endif %}
+        </div>
+
+        <!-- Recent Sessions Mini Table -->
+        <section class="card recent-sessions-card">
+            <div class="card-header flex-between">
+                <h3>📜 Recent Examination Sessions</h3>
+                <a href="{{ url_for('history') }}" class="btn btn-sm btn-outline">View All History &rarr;</a>
+            </div>
+
+            {% if recent_sessions %}
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Subject</th>
+                                <th>Sub-Topic</th>
+                                <th>Score</th>
+                                <th>Time</th>
+                                <th>Hints</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for s in recent_sessions %}
+                                <tr>
+                                    <td><strong>{{ s.subject }}</strong></td>
+                                    <td>{{ s.topic }}</td>
+                                    <td>
+                                        <span class="badge {% if s.score >= 8 %}badge-success{% elif s.score >= 5 %}badge-warning{% else %}badge-danger{% endif %}">
+                                            {{ s.score }}/{{ s.total }}
+                                        </span>
+                                    </td>
+                                    <td>{{ s.time_taken_seconds }}s</td>
+                                    <td>{{ s.hints_used }} / 3</td>
+                                    <td><small class="text-muted">{{ s.created_at.strftime('%Y-%m-%d %H:%M') if s.created_at else '' }}</small></td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted">No recent sessions found.</p>
+            {% endif %}
+        </section>
+
+    {% else %}
+        <!-- Empty State -->
+        <section class="card empty-dashboard-card text-center">
+            <div class="empty-icon">📊</div>
+            <h2>No Viva Examination Records Yet</h2>
+            <p class="text-muted">Complete your first oral viva session to unlock real-time subject analytics, weak topic detection, and PDF progress reports!</p>
+            <div class="mt-4">
+                <a href="{{ url_for('index') }}" class="btn btn-primary btn-lg">
+                    🚀 Begin Your First Viva Now
+                </a>
+            </div>
+        </section>
+    {% endif %}
+</div>
+{% endblock %}

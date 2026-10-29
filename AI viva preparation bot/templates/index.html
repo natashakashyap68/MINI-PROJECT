@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Prepare for Oral Technical Vivas - AI Viva Prep Bot{% endblock %}
+
+{% block content %}
+<div class="hero-section">
+    <div class="hero-content">
+        <h1 class="hero-title">Master Your Oral Technical Vivas with AI 🎓</h1>
+        <p class="hero-subtitle">
+            Simulate realistic university and interview viva examinations with real-time AI evaluation, speech recognition, countdown timers, progressive hints, and weak topic analytics.
+        </p>
+    </div>
+</div>
+
+<div class="grid-layout">
+    <!-- Main Viva Configuration Card -->
+    <section class="card config-card">
+        <div class="card-header">
+            <h2>🎯 Start a Viva Session</h2>
+            <p class="text-muted">Customize your subject, difficulty, and examination conditions.</p>
+        </div>
+
+        <form action="{{ url_for('practice') }}" method="POST" class="viva-form">
+            <div class="form-group">
+                <label for="subject">Subject / Technical Domain:</label>
+                <select name="subject" id="subject" class="form-control" required>
+                    <option value="Operating Systems">Operating Systems (OS)</option>
+                    <option value="Data Structures">Data Structures & Algorithms (DSA)</option>
+                    <option value="Database Systems">Database Management Systems (DBMS)</option>
+                    <option value="Machine Learning">Machine Learning & AI (ML)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="topic">Specific Sub-Topic <span class="text-muted">(Optional)</span>:</label>
+                <input type="text" name="topic" id="topic" class="form-control" placeholder="e.g. Deadlock, QuickSort, ACID, Overfitting...">
+                <small class="form-hint">Leave blank to let AI select an essential viva concept automatically.</small>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group col">
+                    <label for="difficulty">Difficulty Level:</label>
+                    <select name="difficulty" id="difficulty" class="form-control">
+                        <option value="Beginner">Beginner (Core Definitions)</option>
+                        <option value="Intermediate" selected>Intermediate (Mechanisms & Comparisons)</option>
+                        <option value="Advanced">Advanced (System Design & Edge Cases)</option>
+                    </select>
+                </div>
+
+                <div class="form-group col">
+                    <label for="time_limit">Viva Response Timer:</label>
+                    <select name="time_limit" id="time_limit" class="form-control">
+                        <option value="60">60 Seconds (Rapid Fire)</option>
+                        <option value="90" selected>90 Seconds (Standard Viva)</option>
+                        <option value="120">120 Seconds (In-Depth)</option>
+                        <option value="180">180 Seconds (Extended)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="timed_mode" id="timed_mode" checked>
+                    <span class="custom-checkbox"></span>
+                    <span><strong>Enable Timed Viva Mode</strong> (Enforces oral response time limit with countdown)</span>
+                </label>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block btn-lg">
+                🚀 Start Simulated Viva
+            </button>
+        </form>
+    </section>
+
+    <!-- Sidebar Cards: Key Features & Quick Links -->
+    <aside class="sidebar-cards">
+        <div class="card feature-card">
+            <h3>🎙️ Voice Interaction</h3>
+            <p>Speak your answer aloud using the built-in browser microphone transcription, or listen to the examiner read questions aloud.</p>
+        </div>
+
+        <div class="card feature-card">
+            <h3>💡 Smart Progressive Hints</h3>
+            <p>Stuck on a tricky question? Unlock 3 progressive hints from conceptual directions to architectural clues.</p>
+        </div>
+
+        <div class="card feature-card">
+            <h3>📊 Weak Topic Detector</h3>
+            <p>Our AI tracks your scores across sessions to identify knowledge gaps and generate targeted study recommendations.</p>
+            {% if current_user %}
+                <a href="{{ url_for('dashboard') }}" class="btn btn-outline btn-sm">View Weak Topics & Analytics &rarr;</a>
+            {% else %}
+                <a href="{{ url_for('login') }}" class="btn btn-outline btn-sm">Sign In to Track Analytics &rarr;</a>
+            {% endif %}
+        </div>
+    </aside>
+</div>
+{% endblock %}

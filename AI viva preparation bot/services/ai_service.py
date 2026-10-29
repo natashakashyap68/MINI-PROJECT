@@ -1,0 +1,342 @@
+import json
+import logging
+import os
+from pydantic import BaseModel, Field
+from typing import List, Optional
+
+logger = logging.getLogger(__name__)
+
+# Structured Pydantic Schemas for Gemini Outputs
+
+class QuestionSchema(BaseModel):
+    question: str = Field(description="The oral viva examination question.")
+    topic: str = Field(description="The specific sub-topic or concept tested.")
+    difficulty: str = Field(description="Beginner, Intermediate, or Advanced.")
+    hints: List[str] = Field(description="3 progressive hints from subtle clue to detailed guidance.")
+
+class EvaluationSchema(BaseModel):
+    score: int = Field(description="Score out of 10 earned by the student based on conceptual accuracy, depth, and clarity.")
+    feedback: str = Field(description="Constructive, specific feedback addressing strengths and conceptual gaps.")
+    improved_answer: str = Field(description="A clear, exemplary model answer suitable for an oral viva.")
+    followup_question: str = Field(description="A natural follow-up question an oral examiner would ask to probe deeper.")
+
+class StudyPlanSchema(BaseModel):
+    weak_subject: str = Field(description="The primary subject where performance is lowest.")
+    recommended_topics: List[str] = Field(description="List of 3-5 sub-topics the student needs to practice.")
+    actionable_advice: str = Field(description="2-3 sentences of personalized, actionable advice.")
+
+
+# High-quality offline question repository for seamless fallback/testing
+FALLBACK_QUESTIONS = {
+    "Data Structures": [
+        {
+            "question": "Explain the difference between an Array and a Linked List in terms of memory allocation, insertion efficiency, and cache performance.",
+            "topic": "Arrays vs Linked Lists",
+            "difficulty": "Intermediate",
+            "hints": [
+                "Consider whether memory elements are stored contiguously or dispersed across the heap.",
+                "Think about CPU cache locality and pointer traversal overhead.",
+                "Contrast O(1) random index access with O(1) head insertion."
+            ]
+        },
+        {
+            "question": "What is the worst-case time complexity of QuickSort, why does it occur, and how does randomized pivot selection prevent it?",
+            "topic": "Sorting Algorithms",
+            "difficulty": "Intermediate",
+            "hints": [
+                "Think about what happens when the chosen pivot is always the smallest or largest element.",
+                "Recall the difference between O(n log n) and O(n^2) partition trees.",
+                "Explain how choosing a random pivot avoids partitioned unbalanced splits on already sorted arrays."
+            ]
+        },
+        {
+            "question": "How does a Hash Map resolve collisions using Separate Chaining versus Open Addressing, and what is the load factor?",
+            "topic": "Hash Tables",
+            "difficulty": "Advanced",
+            "hints": [
+                "Separate chaining stores colliding entries in linked lists or balanced trees at each bucket index.",
+                "Open addressing probes alternative slots within the same array (linear probing, quadratic probing, double hashing).",
+                "Load factor = (number of entries) / (table capacity), triggering rehashing when threshold is exceeded."
+            ]
+        }
+    ],
+    "Operating Systems": [
+        {
+            "question": "What is the difference between a process and a thread, and how does context switching differ between them?",
+            "topic": "Processes & Threads",
+            "difficulty": "Intermediate",
+            "hints": [
+                "A process has its own isolated address space, while threads of the same process share code, data, and heap.",
+                "Threads only maintain their own stack, registers, and program counter.",
+                "Context switching between processes requires invalidating the TLB and loading a new page table, which is more expensive."
+            ]
+        },
+        {
+            "question": "Explain the four Coffman conditions necessary for a Deadlock to occur in an operating system. How can one be eliminated?",
+            "topic": "Deadlock",
+            "difficulty": "Intermediate",
+            "hints": [
+                "Think of: Mutual Exclusion, Hold and Wait, No Preemption, and Circular Wait.",
+                "Consider resource hierarchy/ordering as a technique to eliminate Circular Wait.",
+                "Deadlock cannot occur if at least one of these four conditions is strictly prevented."
+            ]
+        },
+        {
+            "question": "What is Virtual Memory, how does Paging work, and what happens step-by-step during a Page Fault?",
+            "topic": "Memory Management",
+            "difficulty": "Advanced",
+            "hints": [
+                "Virtual memory maps virtual addresses generated by the CPU to physical memory frames via Page Tables.",
+                "A page fault is a hardware interrupt triggered when the valid/invalid bit indicates the referenced page is on disk.",
+                "The OS locates the page in swap space, swaps it into a free frame, updates the page table, and restarts the instruction."
+            ]
+        }
+    ],
+    "Database Systems": [
+        {
+            "question": "What are ACID properties in database transactions? Explain what Isolation means and give an example of a Dirty Read.",
+            "topic": "Transactions & ACID",
+            "difficulty": "Intermediate",
+            "hints": [
+                "A: Atomicity, C: Consistency, I: Isolation, D: Durability.",
+                "Isolation ensures concurrent transactions execute without interfering with one another.",
+                "A Dirty Read occurs when Transaction B reads uncommitted data modified by Transaction A, which later rolls back."
+            ]
+        },
+        {
+            "question": "Explain the difference between 2NF (Second Normal Form) and 3NF (Third Normal Form) in relational schema design.",
+            "topic": "Normalization",
+            "difficulty": "Intermediate",
+            "hints": [
+                "2NF requires 1NF and no partial dependency (non-prime attributes must depend on the whole candidate key).",
+                "3NF requires 2NF and no transitive dependency (non-prime attributes must not depend on other non-prime attributes).",
+                "Look for 'A -> B' and 'B -> C' where C transitively depends on the primary key."
+            ]
+        },
+        {
+            "question": "How does a B+ Tree index speed up range queries compared to a binary search tree or hash index?",
+            "topic": "Indexing",
+            "difficulty": "Advanced",
+            "hints": [
+                "B+ trees store all actual data pointers only in leaf nodes.",
+                "Leaf nodes are linked together in a doubly linked list, enabling sequential range scans O(k + log n).",
+                "High fan-out minimizes disk I/O operations compared to deep binary search trees."
+            ]
+        }
+    ],
+    "Machine Learning": [
+        {
+            "question": "What is the Bias-Variance tradeoff? Explain what happens to training error and validation error when a model is overfitting.",
+            "topic": "Model Generalization",
+            "difficulty": "Intermediate",
+            "hints": [
+                "High bias leads to underfitting (model is too simplistic to capture patterns).",
+                "High variance leads to overfitting (model memorizes training noise and fails to generalize).",
+                "Overfitting causes very low training error but high and diverging validation error."
+            ]
+        },
+        {
+            "question": "Explain Precision, Recall, and the F1-Score. In a medical cancer detection system, would you prioritize Precision or Recall, and why?",
+            "topic": "Evaluation Metrics",
+            "difficulty": "Intermediate",
+            "hints": [
+                "Precision = TP / (TP + FP). Recall = TP / (TP + FN).",
+                "In cancer detection, false negatives can be fatal, so missing a positive case is catastrophic.",
+                "Therefore, high Recall is prioritized to catch all true cases, even if some false positives require secondary checks."
+            ]
+        },
+        {
+            "question": "What is the Vanishing Gradient problem in Deep Neural Networks, why does the Sigmoid activation cause it, and how does ReLU mitigate it?",
+            "topic": "Neural Networks",
+            "difficulty": "Advanced",
+            "hints": [
+                "During backpropagation, gradients are multiplied across layers using the chain rule.",
+                "The derivative of the Sigmoid function tops out at 0.25, shrinking gradients exponentially towards early layers.",
+                "ReLU has a constant gradient of 1 for positive inputs, preventing gradient vanishing."
+            ]
+        }
+    ]
+}
+
+
+class AIService:
+    def __init__(self, api_key: Optional[str] = None, model_name: str = "gemini-2.5-flash"):
+        self.api_key = api_key or os.getenv("GEMINI_API_KEY", "").strip()
+        self.model_name = model_name or os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+        self.client = None
+
+        if self.api_key:
+            try:
+                from google import genai
+                self.client = genai.Client(api_key=self.api_key)
+                logger.info("Gemini AI Client initialized successfully.")
+            except Exception as e:
+                logger.warning(f"Failed to initialize Gemini AI client: {e}. Falling back to offline mode.")
+                self.client = None
+        else:
+            logger.info("No GEMINI_API_KEY detected. Running in offline viva mode.")
+
+    def is_online(self) -> bool:
+        return self.client is not None and bool(self.api_key)
+
+    def generate_question(self, subject: str, difficulty: str = "Intermediate", topic: Optional[str] = None) -> dict:
+        """Generate a technical viva examination question with progressive hints."""
+        if self.is_online():
+            try:
+                topic_clause = f" specifically on the sub-topic '{topic}'" if topic else ""
+                prompt = (
+                    f"You are a strict, knowledgeable university professor conducting an oral technical viva examination.\n"
+                    f"Generate 1 high-quality viva question on the subject '{subject}'{topic_clause} at '{difficulty}' difficulty level.\n"
+                    f"Also provide the specific sub-topic and exactly 3 progressive hints for students who get stuck:\n"
+                    f"- Hint 1: High-level conceptual direction without giving the answer away.\n"
+                    f"- Hint 2: Clue pointing towards the core mechanism, architecture, or analogy.\n"
+                    f"- Hint 3: Key technical keywords or principles they should mention."
+                )
+
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=prompt,
+                    config={
+                        "response_mime_type": "application/json",
+                        "response_schema": QuestionSchema,
+                    }
+                )
+                data = json.loads(response.text)
+                return {
+                    "question": data.get("question"),
+                    "topic": data.get("topic", topic or "General"),
+                    "difficulty": data.get("difficulty", difficulty),
+                    "hints": data.get("hints", [])
+                }
+            except Exception as e:
+                logger.error(f"Error calling Gemini for question generation: {e}. Falling back.")
+
+        # Fallback question generation
+        bank = FALLBACK_QUESTIONS.get(subject, FALLBACK_QUESTIONS["Operating Systems"])
+        import random
+        selected = random.choice(bank)
+        return {
+            "question": selected["question"],
+            "topic": selected.get("topic", topic or "Core Concept"),
+            "difficulty": selected.get("difficulty", difficulty),
+            "hints": selected.get("hints", [
+                "Consider the core principles and definitions.",
+                "Think about how components communicate or allocate resources.",
+                "Mention key trade-offs, time complexities, or architectural constraints."
+            ])
+        }
+
+    def evaluate_answer(self, question: str, user_answer: str, subject: str, topic: str, difficulty: str = "Intermediate") -> dict:
+        """Evaluate a student's viva response, providing score (0-10), feedback, model answer, and follow-up question."""
+        cleaned_answer = (user_answer or "").strip()
+        if not cleaned_answer:
+            return {
+                "score": 0,
+                "feedback": "No answer was provided. In an oral viva, staying silent or leaving the answer blank results in zero points.",
+                "improved_answer": "A comprehensive answer should state the fundamental definition, explain the underlying mechanism, and mention key trade-offs.",
+                "followup_question": f"Can you at least explain the primary concept or definition behind {topic}?"
+            }
+
+        if self.is_online():
+            try:
+                prompt = (
+                    f"You are a rigorous technical viva examiner evaluating a student's oral answer.\n\n"
+                    f"Subject: {subject}\n"
+                    f"Topic: {topic}\n"
+                    f"Difficulty: {difficulty}\n"
+                    f"Question Asked: {question}\n"
+                    f"Student Answer: {cleaned_answer}\n\n"
+                    f"Evaluate the student's answer fairly and rigorously:\n"
+                    f"1. Score out of 10 based on conceptual accuracy, depth, and clarity.\n"
+                    f"2. Provide direct, constructive feedback highlighting what they explained well and what essential technical details or edge cases they missed.\n"
+                    f"3. Provide an exemplary, polished viva model answer (1-2 clear paragraphs).\n"
+                    f"4. Formulate a challenging, logical viva follow-up question to probe their understanding further."
+                )
+
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=prompt,
+                    config={
+                        "response_mime_type": "application/json",
+                        "response_schema": EvaluationSchema,
+                    }
+                )
+                data = json.loads(response.text)
+                return {
+                    "score": int(data.get("score", 5)),
+                    "feedback": data.get("feedback", ""),
+                    "improved_answer": data.get("improved_answer", ""),
+                    "followup_question": data.get("followup_question", "")
+                }
+            except Exception as e:
+                logger.error(f"Error calling Gemini for answer evaluation: {e}. Falling back.")
+
+        # Heuristic fallback evaluation
+        words = len(cleaned_answer.split())
+        if words < 10:
+            score = 3
+            feedback = "Your answer is very brief. In an oral examination, examiners expect you to elaborate with key definitions, mechanisms, and examples."
+        elif words < 35:
+            score = 6
+            feedback = f"Good start on {topic}. You touched upon the basic concept, but you should include more formal terminology and architectural trade-offs."
+        else:
+            score = 8
+            feedback = f"Solid and articulated explanation of {topic}. You demonstrated clear conceptual understanding with relevant details."
+
+        return {
+            "score": score,
+            "feedback": feedback,
+            "improved_answer": (
+                f"For the question '{question}', an exemplary viva answer defines the core principle clearly, "
+                f"describes the underlying mechanism in detail (including memory, algorithmic complexity, or protocols), "
+                f"and concludes with practical real-world trade-offs."
+            ),
+            "followup_question": f"Building on your explanation of {topic}, how would this behavior change under high concurrency or resource constraints?"
+        }
+
+    def generate_study_plan(self, analytics: dict, sessions_summary: List[dict]) -> Optional[dict]:
+        """Analyze student weak topics and produce a targeted study plan."""
+        if not analytics:
+            return None
+
+        # Determine weakest subject from analytics
+        weakest_subject = min(analytics.items(), key=lambda x: x[1])[0]
+
+        if self.is_online():
+            try:
+                prompt = (
+                    f"A student completed oral viva practice sessions. Here are their subject score percentages: {analytics}.\n"
+                    f"Recent performance details: {sessions_summary}.\n"
+                    f"Identify their weakest technical subject, recommend 3-5 specific sub-topics to master, and provide 2-3 sentences of targeted, encouraging advice."
+                )
+
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=prompt,
+                    config={
+                        "response_mime_type": "application/json",
+                        "response_schema": StudyPlanSchema,
+                    }
+                )
+                data = json.loads(response.text)
+                return {
+                    "weak_subject": data.get("weak_subject", weakest_subject),
+                    "recommended_topics": data.get("recommended_topics", []),
+                    "actionable_advice": data.get("actionable_advice", "")
+                }
+            except Exception as e:
+                logger.error(f"Error calling Gemini for study plan: {e}. Falling back.")
+
+        # Fallback study plan
+        fallback_topics = {
+            "Data Structures": ["Graph Traversals (BFS/DFS)", "Dynamic Programming", "Balanced Search Trees (AVL/Red-Black)"],
+            "Operating Systems": ["Virtual Memory & Page Replacement", "Deadlock Avoidance (Banker's Algorithm)", "Concurrency & Mutex Locks"],
+            "Database Systems": ["Transaction Isolation Levels", "B+ Tree Indexing", "Query Optimization & Joins"],
+            "Machine Learning": ["Regularization (L1/L2)", "Gradient Descent Variants", "Overfitting and Cross-Validation"]
+        }
+        return {
+            "weak_subject": weakest_subject,
+            "recommended_topics": fallback_topics.get(weakest_subject, ["Core Fundamentals", "Trade-off Analysis", "System Design Implementation"]),
+            "actionable_advice": f"Your current score in {weakest_subject} is {analytics.get(weakest_subject, 0)}%. Review the theoretical foundations of these topics and practice explaining the mechanisms aloud using precise technical vocabulary."
+        }
+

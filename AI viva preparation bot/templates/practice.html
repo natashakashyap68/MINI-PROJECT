@@ -1,0 +1,330 @@
+{% extends "base.html" %}
+
+{% block title %}Viva Arena - {{ subject }} ({{ difficulty }}){% endblock %}
+
+{% block content %}
+<div class="viva-arena">
+    <!-- Top Meta Bar -->
+    <div class="arena-meta">
+        <div class="badges-row">
+            <span class="badge badge-primary">{{ subject }}</span>
+            <span class="badge badge-secondary">{{ topic }}</span>
+            <span class="badge badge-outline">{{ difficulty }}</span>
+        </div>
+
+        {% if timed_mode %}
+            <div class="timer-box" id="timerContainer">
+                <span class="timer-icon">⏳</span>
+                <span class="timer-label">Time Remaining:</span>
+                <span class="timer-display" id="timeRemainingDisplay">00:00</span>
+                <div class="timer-bar-wrapper">
+                    <div class="timer-bar" id="timerProgressBar"></div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Question Card -->
+    <div class="card question-card">
+        <div class="question-header">
+            <h3>🎓 Viva Examiner's Question:</h3>
+            <button type="button" class="btn btn-sm btn-icon" id="speakQuestionBtn" title="Listen to question spoken aloud">
+                🔊 Listen Aloud
+            </button>
+        </div>
+        <p class="question-text" id="vivaQuestionText">{{ question }}</p>
+
+        <!-- Progressive Hints Container -->
+        <div class="hints-section">
+            <div class="hints-header">
+                <button type="button" class="btn btn-outline btn-sm" id="hintBtn">
+                    💡 Need a Hint? (<span id="hintsLeftCount">3</span> left)
+                </button>
+                <small class="text-muted">Examiners deduct minor points for relying heavily on hints.</small>
+            </div>
+            <div class="hints-list" id="hintsList"></div>
+        </div>
+    </div>
+
+    <!-- Answer Submission Card -->
+    <div class="card answer-card">
+        <form action="{{ url_for('submit_answer') }}" method="POST" id="vivaAnswerForm">
+            <input type="hidden" name="subject" value="{{ subject }}">
+            <input type="hidden" name="topic" value="{{ topic }}">
+            <input type="hidden" name="difficulty" value="{{ difficulty }}">
+            <input type="hidden" name="question" value="{{ question }}">
+            <input type="hidden" name="time_taken_seconds" id="timeTakenInput" value="0">
+            <input type="hidden" name="hints_used" id="hintsUsedInput" value="0">
+
+            <div class="answer-header">
+                <label for="user_answer"><strong>Your Oral or Typed Response:</strong></label>
+                <div class="voice-controls">
+                    <button type="button" class="btn btn-secondary btn-sm" id="micBtn" title="Speak your answer aloud">
+                        <span id="micIcon">🎙️</span> <span id="micStatusText">Speak Answer (Voice Input)</span>
+                    </button>
+                    <span id="micIndicator" class="mic-pulsing" style="display: none;">● Recording...</span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <textarea 
+                    name="user_answer" 
+                    id="user_answer" 
+                    rows="7" 
+                    class="form-control" 
+                    placeholder="Speak using the microphone above or type your technical answer here. Be thorough with definitions, mechanisms, and examples..." 
+                    required></textarea>
+            </div>
+
+            <div class="arena-actions">
+                <button type="submit" class="btn btn-primary btn-lg" id="submitVivaBtn">
+                    📤 Submit Viva Answer for Evaluation
+                </button>
+                <a href="{{ url_for('index') }}" class="btn btn-outline" onclick="return confirm('Abandon this viva session?');">
+                    Cancel & Return
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const timedMode = {{ 'true' if timed_mode else 'false' }};
+    const totalDuration = {{ time_limit }};
+    let timeRemaining = totalDuration;
+    let timeTaken = 0;
+    let timerInterval = null;
+    let hintsUsed = 0;
+    const maxHints = 3;
+
+    const timeTakenInput = document.getElementById("timeTakenInput");
+    const hintsUsedInput = document.getElementById("hintsUsedInput");
+    const vivaForm = document.getElementById("vivaAnswerForm");
+    const answerTextarea = document.getElementById("user_answer");
+
+    // ----------------------------------------------------
+    // 1. Timed Viva Mode Countdown & Auto-Submission
+    // ----------------------------------------------------
+    if (timedMode) {
+        const timeDisplay = document.getElementById("timeRemainingDisplay");
+        const progressBar = document.getElementById("timerProgressBar");
+
+        function updateDisplay() {
+            const minutes = Math.floor(timeRemaining / 60);
+            const seconds = timeRemaining % 60;
+            timeDisplay.textContent = 
+                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+            const percent = (timeRemaining / totalDuration) * 100;
+            progressBar.style.width = `${percent}%`;
+
+            if (percent <= 25) {
+                progressBar.style.backgroundColor = "var(--danger-color, #ef4444)";
+                timeDisplay.style.color = "var(--danger-color, #ef4444)";
+            } else if (percent <= 50) {
+                progressBar.style.backgroundColor = "var(--warning-color, #f59e0b)";
+            }
+        }
+
+        updateDisplay();
+
+        timerInterval = setInterval(function () {
+            timeRemaining--;
+            timeTaken++;
+            timeTakenInput.value = timeTaken;
+            updateDisplay();
+
+            if (timeRemaining <= 0) {
+                clearInterval(timerInterval);
+                timeDisplay.textContent = "00:00 - TIME UP!";
+                alert("⏳ Time is up for this oral viva question! Your response is being submitted for evaluation.");
+                vivaForm.submit();
+            }
+        }, 1000);
+    } else {
+        // Track elapsed time even in untimed mode for user stats
+        timerInterval = setInterval(function () {
+            timeTaken++;
+            timeTakenInput.value = timeTaken;
+        }, 1000);
+    }
+
+    // ----------------------------------------------------
+    // 2. Text-to-Speech (Read Question Aloud)
+    // ----------------------------------------------------
+    const speakBtn = document.getElementById("speakQuestionBtn");
+    const questionText = document.getElementById("vivaQuestionText").innerText;
+
+    if ('speechSynthesis' in window) {
+        speakBtn.addEventListener("click", function () {
+            if (window.speechSynthesis.speaking) {
+                window.speechSynthesis.cancel();
+                speakBtn.textContent = "🔊 Listen Aloud";
+                return;
+            }
+            const utterance = new SpeechSynthesisUtterance(questionText);
+            utterance.rate = 0.95;
+            utterance.pitch = 1.0;
+            utterance.onend = function () {
+                speakBtn.textContent = "🔊 Listen Aloud";
+            };
+            window.speechSynthesis.speak(utterance);
+            speakBtn.textContent = "⏹️ Stop Audio";
+        });
+    } else {
+        speakBtn.style.display = "none";
+    }
+
+    // ----------------------------------------------------
+    // 3. Voice Interaction (Speech-to-Text Microphone)
+    // ----------------------------------------------------
+    const micBtn = document.getElementById("micBtn");
+    const micIcon = document.getElementById("micIcon");
+    const micStatus = document.getElementById("micStatusText");
+    const micIndicator = document.getElementById("micIndicator");
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+        let isRecording = false;
+
+        micBtn.addEventListener("click", function () {
+            if (!isRecording) {
+                try {
+                    recognition.start();
+                    isRecording = true;
+                    micIcon.textContent = "⏹️";
+                    micStatus.textContent = "Stop Recording";
+                    micIndicator.style.display = "inline";
+                    micBtn.classList.add("btn-danger");
+                    micBtn.classList.remove("btn-secondary");
+                } catch (err) {
+                    console.error("Speech recognition error:", err);
+                }
+            } else {
+                recognition.stop();
+                isRecording = false;
+                micIcon.textContent = "🎙️";
+                micStatus.textContent = "Speak Answer (Voice Input)";
+                micIndicator.style.display = "none";
+                micBtn.classList.remove("btn-danger");
+                micBtn.classList.add("btn-secondary");
+            }
+        });
+
+        recognition.onresult = function (event) {
+            let finalTranscript = '';
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    finalTranscript += event.results[i][0].transcript + ' ';
+                }
+            }
+            if (finalTranscript) {
+                if (answerTextarea.value && !answerTextarea.value.endsWith(' ')) {
+                    answerTextarea.value += ' ' + finalTranscript;
+                } else {
+                    answerTextarea.value += finalTranscript;
+                }
+            }
+        };
+
+        recognition.onerror = function (event) {
+            console.warn("Speech recognition warning/error:", event.error);
+            isRecording = false;
+            micIcon.textContent = "🎙️";
+            micStatus.textContent = "Speak Answer (Voice Input)";
+            micIndicator.style.display = "none";
+            micBtn.classList.remove("btn-danger");
+            micBtn.classList.add("btn-secondary");
+        };
+
+        recognition.onend = function () {
+            if (isRecording) {
+                // If it stopped automatically, update button state
+                isRecording = false;
+                micIcon.textContent = "🎙️";
+                micStatus.textContent = "Speak Answer (Voice Input)";
+                micIndicator.style.display = "none";
+                micBtn.classList.remove("btn-danger");
+                micBtn.classList.add("btn-secondary");
+            }
+        };
+    } else {
+        micBtn.disabled = true;
+        micStatus.textContent = "Voice input unsupported in this browser (use typing)";
+        micBtn.title = "Your browser does not support Web Speech Recognition. You can type your answer directly.";
+    }
+
+    // ----------------------------------------------------
+    // 4. Smart Progressive Hints System
+    // ----------------------------------------------------
+    const hintBtn = document.getElementById("hintBtn");
+    const hintsList = document.getElementById("hintsList");
+    const hintsLeftCount = document.getElementById("hintsLeftCount");
+
+    hintBtn.addEventListener("click", function () {
+        if (hintsUsed >= maxHints) {
+            alert("You have unlocked all available hints for this viva question.");
+            return;
+        }
+
+        hintBtn.disabled = true;
+        hintBtn.textContent = "Fetching hint...";
+
+        fetch("{{ url_for('get_hint') }}", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                hint_index: hintsUsed,
+                question: questionText
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.hint) {
+                hintsUsed++;
+                hintsUsedInput.value = hintsUsed;
+                hintsLeftCount.textContent = (maxHints - hintsUsed).toString();
+
+                const hintBox = document.createElement("div");
+                hintBox.className = "hint-item";
+                hintBox.innerHTML = `<strong>💡 Progressive Hint ${data.hint_number}:</strong> <span>${data.hint}</span>`;
+                hintsList.appendChild(hintBox);
+
+                if (hintsUsed >= maxHints) {
+                    hintBtn.disabled = true;
+                    hintBtn.textContent = "All Hints Unlocked (3/3)";
+                } else {
+                    hintBtn.disabled = false;
+                    hintBtn.innerHTML = `💡 Need a Hint? (<span id="hintsLeftCount">${maxHints - hintsUsed}</span> left)`;
+                }
+            } else {
+                hintBtn.disabled = false;
+                hintBtn.textContent = "💡 Need a Hint?";
+            }
+        })
+        .catch(err => {
+            console.error("Error retrieving hint:", err);
+            hintBtn.disabled = false;
+            hintBtn.textContent = "💡 Need a Hint?";
+        });
+    });
+
+    // Stop speech synthesis on form submit
+    vivaForm.addEventListener("submit", function () {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+        }
+    });
+});
+</script>
+{% endblock %}

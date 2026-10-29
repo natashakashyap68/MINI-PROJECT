@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Sign In - AI Viva Prep Bot{% endblock %}
+
+{% block content %}
+<div class="auth-wrapper">
+    <div class="card auth-card">
+        <div class="card-header text-center">
+            <h2>Welcome Back</h2>
+            <p class="text-muted">Sign in to track your viva scores, history, and AI study plans.</p>
+        </div>
+
+        <form action="{{ url_for('login') }}" method="POST" class="auth-form">
+            <div class="form-group">
+                <label for="identifier">Username or Email</label>
+                <input type="text" id="identifier" name="identifier" class="form-control" placeholder="Enter username or email" required autofocus>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" class="form-control" placeholder="Enter password" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block">Sign In</button>
+        </form>
+
+        <div class="card-footer text-center">
+            <p>New to AI Viva Prep? <a href="{{ url_for('register') }}">Create an account</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
